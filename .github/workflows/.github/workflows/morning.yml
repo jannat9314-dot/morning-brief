@@ -2,13 +2,12 @@ name: Morning Brief
 
 on:
   schedule:
-    - cron: '0 3 * * *'   # runs daily (8:30 AM IST)
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
