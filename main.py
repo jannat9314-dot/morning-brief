@@ -49,7 +49,7 @@ Source: {article['source']['name']}
 
 
 # -------- AI --------
-client = OpenAI(api_key=OPENAI_API)
+client = OpenAI(api_key=OPENAI_API) 
 
 prompt = f"""
 You are my daily morning briefing assistant.
