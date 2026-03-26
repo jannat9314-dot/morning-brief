@@ -1,123 +1,79 @@
-import requests
-from openai import OpenAI
-import smtplib
-from email.mime.text import MIMEText
-# -------- CONFIG --------
-WEATHER_API = "b454d0f2850c4975284d563ee5d95d43"
-NEWS_API = "93db5f9bd979c78ea846b17b35526e20"
-OPENAI_API = "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"
+"""Primary application entrypoint."""
 
-CITY = "Ludhiana"
+import locale
+import logging
+import os
+import sys
+import warnings
+from typing import List, Optional
 
-# -------- WEATHER --------
-weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={CITY}&appid={WEATHER_API}&units=metric"
+from pip._internal.cli.autocompletion import autocomplete
+from pip._internal.cli.main_parser import parse_command
+from pip._internal.commands import create_command
+from pip._internal.exceptions import PipError
+from pip._internal.utils import deprecation
 
-weather_res = requests.get(weather_url)
-weather_data = weather_res.json()
-
-if weather_data.get("cod") != 200:
-    print("Weather Error:", weather_data)
-    temp = "N/A"
-    weather = "N/A"
-else:
-    temp = weather_data["main"]["temp"]
-    weather = weather_data["weather"][0]["description"]
+logger = logging.getLogger(__name__)
 
 
-# -------- NEWS --------
-news_url = f"https://gnews.io/api/v4/top-headlines?country=in&lang=en&token={NEWS_API}"
-news_res = requests.get(news_url)
-news_data = news_res.json()
+# Do not import and use main() directly! Using it directly is actively
+# discouraged by pip's maintainers. The name, location and behavior of
+# this function is subject to change, so calling it directly is not
+# portable across different pip versions.
 
-articles = []
+# In addition, running pip in-process is unsupported and unsafe. This is
+# elaborated in detail at
+# https://pip.pypa.io/en/stable/user_guide/#using-pip-from-your-program.
+# That document also provides suggestions that should work for nearly
+# all users that are considering importing and using main() directly.
 
-if "articles" in news_data:
-    articles = news_data["articles"][:8]
-else:
-    print("News Error:", news_data)
+# However, we know that certain users will still want to invoke pip
+# in-process. If you understand and accept the implications of using pip
+# in an unsupported manner, the best approach is to use runpy to avoid
+# depending on the exact location of this entry point.
+
+# The following example shows how to use runpy to invoke pip in that
+# case:
+#
+#     sys.argv = ["pip", your, args, here]
+#     runpy.run_module("pip", run_name="__main__")
+#
+# Note that this will exit the process after running, unlike a direct
+# call to main. As it is not safe to do any processing after calling
+# main, this should not be an issue in practice.
 
 
-# -------- BUILD RAW NEWS (IMPORTANT UPGRADE) --------
-raw_news = ""
+def main(args: Optional[List[str]] = None) -> int:
+    if args is None:
+        args = sys.argv[1:]
 
-for article in articles:
-    raw_news += f"""
-Title: {article['title']}
-Description: {article['description']}
-Source: {article['source']['name']}
-"""
+    # Suppress the pkg_resources deprecation warning
+    # Note - we use a module of .*pkg_resources to cover
+    # the normal case (pip._vendor.pkg_resources) and the
+    # devendored case (a bare pkg_resources)
+    warnings.filterwarnings(
+        action="ignore", category=DeprecationWarning, module=".*pkg_resources"
+    )
 
+    # Configure our deprecation warnings to be sent through loggers
+    deprecation.install_warning_logger()
 
-# -------- AI --------
-client = OpenAI(api_key=OPENAI_API)
+    autocomplete()
 
-prompt = f"""
-You are my daily morning briefing assistant.
+    try:
+        cmd_name, cmd_args = parse_command(args)
+    except PipError as exc:
+        sys.stderr.write(f"ERROR: {exc}")
+        sys.stderr.write(os.linesep)
+        sys.exit(1)
 
-About me:
-Jannat Kondal, 1st year CSE student.
-I care about: coding, AI, startups, geopolitics, media, Indian tech ecosystem.
+    # Needed for locale.getpreferredencoding(False) to work
+    # in pip._internal.utils.encoding.auto_decode
+    try:
+        locale.setlocale(locale.LC_ALL, "")
+    except locale.Error as e:
+        # setlocale can apparently crash if locale are uninitialized
+        logger.debug("Ignoring error %s when setting locale", e)
+    command = create_command(cmd_name, isolated=("--isolated" in cmd_args))
 
-Your job:
-Give me a HIGH-SIGNAL morning briefing. Not generic headlines.
-
-Rules:
-- Select the 5–6 MOST important stories (no fluff)
-- Prioritize: AI, tech, startups, geopolitics, business, major global shifts
-- Skip: entertainment, cricket, gossip unless extremely important
-
-For EACH story:
-• Bold headline  
-• 3–5 sentence summary  
-• Why it matters to me (specific to CSE/tech mindset)  
-• “So what” → one clear takeaway  
-
-Extra:
-- Connect dots
-- Be opinionated when needed
-- Skip useless stories completely
-
-Tone:
-- Smart friend
-- No corporate tone
-- No fluff
-
-Structure:
-- Clean
-- Scannable
-
-Weather:
-{temp}°C, {weather}
-
-News:
-{raw_news}
-"""
-
-response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-        {"role": "user", "content": prompt}
-    ]
-)
-
-ai_output = response.choices[0].message.content
-
-# -------- FINAL OUTPUT --------
-print("\n\n===== MORNING BRIEFING =====\n")
-print(ai_output)
-# -------- EMAIL --------
-EMAIL = "jannat9314@gmail.com"
-APP_PASSWORD = "ujkt qadq tbos dipb"
-
-msg = MIMEText(ai_output)
-msg["Subject"] = "Your Daily Morning Briefing ☀️"
-msg["From"] = EMAIL
-msg["To"] = EMAIL
-
-try:
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(EMAIL, APP_PASSWORD)
-        server.send_message(msg)
-    print("Email sent successfully ✅")
-except Exception as e:
-    print("Email failed ❌", e)
+    return command.main(cmd_args)
