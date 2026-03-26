@@ -22,4 +22,10 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run script
+        env:
+          WEATHER_API: ${{ secrets.WEATHER_API }}
+          NEWS_API: ${{ secrets.NEWS_API }}
+          OPENAI_API: ${{ secrets.OPENAI_API }}
+          EMAIL: ${{ secrets.EMAIL }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
         run: python main.py
