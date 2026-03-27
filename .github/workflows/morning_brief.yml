@@ -25,7 +25,10 @@ jobs:
 
       - name: Run script
         env:
-          # If your code uses these, we must link them here
+          # Connecting your GitHub Secrets to the Environment Variables
           EMAIL: ${{ secrets.EMAIL }}
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          OPENAI_API: ${{ secrets.OPENAI_API }}
+          NEWS_API: ${{ secrets.NEWS_API }}
+          WEATHER_API: ${{ secrets.WEATHER_API }}
         run: python main.py
